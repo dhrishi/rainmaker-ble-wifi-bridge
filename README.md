@@ -1,8 +1,17 @@
 # BLE - Wi-Fi Bridge Example
 
-## Build and Flash firmware
+## Requirements
+* Hardware
+  * ESP32
+* Software
+  * ESP-RainMaker: Follow the ESP RainMaker Documentation [Get Started](https://rainmaker.espressif.com/docs/get-started.html) section
 
-Follow the ESP RainMaker Documentation [Get Started](https://rainmaker.espressif.com/docs/get-started.html) section to build and flash this firmware. Just note the path of this example.
+## Build and Flash
+```bash
+$ git clone https://github.com/dhrishi/rainmaker-ble-wifi-bridge
+$ cd rainmaker-ble-wifi-bridge
+$ RAINMAKER_PATH=/path/to/where/esp-rainmaker/exists idf.py build flash monitor
+```
 
 ## What to expect in this example?
 - This example showcases a BLE - Wi-Fi bridge to facilitate access to registered BLE devices over the cloud.
