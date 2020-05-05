@@ -1,6 +1,6 @@
 # Easy-to-extend BLE - Wi-Fi Bridge
 
-A fully-functional BLE - Wi-Fi Bridge. Control/Access the BLE devices in your home remotely using phone apps. If you have any BLE devices you own, simply add their BLE protocol, and any ESP32 DevKit will start acting as a BLE - Wi-Fi Bridge.
+A fully-functional BLE - Wi-Fi Bridge. Control/Access the BLE accessories in your home remotely using phone apps. If you have any BLE devices you own, simply add their BLE protocol, and any ESP32 DevKit will start acting as a BLE - Wi-Fi Bridge.
 
 ## Requirements
 * Hardware
@@ -16,18 +16,23 @@ $ cd rainmaker-ble-wifi-bridge
 $ RAINMAKER_PATH=/path/to/where/esp-rainmaker/exists idf.py build flash monitor
 ```
 
-## What to expect in this example?
-- This example showcases a BLE - Wi-Fi bridge to facilitate access to registered BLE devices remotely using phone apps.
+## Functionality
+- This is a BLE - Wi-Fi bridge that facilitates access to registered BLE accessories remotely using phone apps.
 - BLE devices in the vicinity are discovered by the bridge and are represented as RainMaker devices which can be seen and controlled through the iOS/Android app.
 - When a parameter update is received to ESP32 over Wi-Fi (from the iOS/Android app), it is mapped to the format accepted by the corresponding device and a characteristic write over BLE for is executed. This results into the actual action on the BLE device.
 
-## Supported BLE Accessories
+### Supported BLE Accessories
 Currently supported accessories:
 * Syska Light Bulb
 * PLAYBULB CANDLE
 * Adds-yours
 
 <img src="https://raw.githubusercontent.com/wiki/dhrishi/rainmaker-ble-wifi-bridge/images/BLE_Wi-Fi_Bridge_App.jpeg" width="250"/>
+
+
+### Limitations
+- The BLE accessories to be added should be discoverable before starting the RainMaker framework.
+- The BLE accessory should be connected while controlling it from the iOS/Android app.
 
 
 ### Reset to Factory
