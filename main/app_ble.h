@@ -11,6 +11,7 @@
 
 #define MAX_DEV CONFIG_BT_NIMBLE_MAX_CONNECTIONS
 #define SCAN_DURATION_MS (30 * 1000)
+#define RESCAN_DURATION_MS (5 * 1000)
 
 typedef esp_err_t (*add_func_t)(void);
 typedef struct ble_dev *ble_dev_handle_t;

@@ -151,27 +151,30 @@ static esp_err_t app_light_set_saturation(const char *dev_name, uint16_t saturat
 
 static esp_err_t syska_light_cb(const char *dev_name, const char *name, esp_rmaker_param_val_t val, void *priv_data)
 {
+    esp_err_t ret;
     if (strcmp(name, ESP_RMAKER_DEF_POWER_NAME) == 0) {
         ESP_LOGI(TAG, "Received value = %s for %s - %s",
                 val.val.b? "true" : "false", dev_name, name);
-        app_light_set_power(dev_name, val.val.b);
+        ret = app_light_set_power(dev_name, val.val.b);
     } else if (strcmp(name, "brightness") == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
                 val.val.i, dev_name, name);
-        app_light_set_brightness(dev_name, val.val.i);
+        ret = app_light_set_brightness(dev_name, val.val.i);
     } else if (strcmp(name, "hue") == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
                 val.val.i, dev_name, name);
-        app_light_set_hue(dev_name, val.val.i);
+        ret = app_light_set_hue(dev_name, val.val.i);
     } else if (strcmp(name, "saturation") == 0) {
         ESP_LOGI(TAG, "Received value = %d for %s - %s",
                 val.val.i, dev_name, name);
-        app_light_set_saturation(dev_name, val.val.i);
+        ret = app_light_set_saturation(dev_name, val.val.i);
     } else {
         /* Silently ignoring invalid params */
         return ESP_OK;
     }
-    esp_rmaker_update_param(dev_name, name, val);
+    if (ret == ESP_OK) {
+        esp_rmaker_update_param(dev_name, name, val);
+    }
     return ESP_OK;
 }
 

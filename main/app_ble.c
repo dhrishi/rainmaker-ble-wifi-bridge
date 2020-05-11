@@ -31,10 +31,11 @@ struct ble_dev {
     ble_addr_t addr;
     struct ble_gatt_svc svc;
     struct ble_gatt_chr chr;
+    bool reconnect;
 };
 
 static struct ble_dev s_ble_dev[MAX_DEV];
-static SemaphoreHandle_t x_sem;
+static SemaphoreHandle_t s_sem;
 
 static int app_ble_gap_event(struct ble_gap_event *event, void *arg);
 
@@ -70,19 +71,27 @@ void ble_store_config_init(void);
 /**
  * Initiates the GAP general discovery procedure.
  */
-static void app_ble_scan(bool first_time)
+static void app_ble_scan(int type, const char *name)
 {
-    uint8_t own_addr_type;
     struct ble_gap_disc_params disc_params;
+    uint8_t own_addr_type;
     int rc, duration_ms;
     static int64_t time;
 
-    if (first_time) {
+    if (type == 0) {
+        /* First time */
         duration_ms = SCAN_DURATION_MS;
         time = esp_timer_get_time();
+    } else if (type == 1) {
+        /* Rescanning after starting RainMaker framework as the BLE accessory to be
+         * updated is not currently connected */
+        duration_ms = RESCAN_DURATION_MS;
     } else {
+        /* Rescanning to add a new registered device. This is done before starting
+         * the RainMaker framework */
         duration_ms = SCAN_DURATION_MS - ((esp_timer_get_time() - time) / 1000);
     }
+
     if (duration_ms < 0) {
         duration_ms = 0;
     }
@@ -112,7 +121,7 @@ static void app_ble_scan(bool first_time)
     disc_params.limited = 0;
 
     rc = ble_gap_disc(own_addr_type, duration_ms, &disc_params,
-                      app_ble_gap_event, NULL);
+                      app_ble_gap_event, (void *)name);
     if (rc != 0) {
         ESP_LOGE(TAG, "Error initiating GAP discovery procedure; rc=%d", rc);
     }
@@ -194,12 +203,14 @@ static void app_ble_connect_if_interesting(const struct ble_gap_disc_desc *disc)
     /* Try to connect the the advertiser.  Allow 30 seconds (30000 ms) for
      * timeout.
      */
-    rc = ble_gap_connect(own_addr_type, &disc->addr, 30000, NULL,
+    if (s_ble_dev[dev_index].conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+        rc = ble_gap_connect(own_addr_type, &disc->addr, 30000, NULL,
                          app_ble_gap_event, (void *)dev_index);
-    if (rc != 0) {
-        ESP_LOGE(TAG, "Failed to connect to device; addr_type=%d addr=%s; rc=%d",
+        if (rc != 0) {
+            ESP_LOGE(TAG, "Failed to connect to device; addr_type=%d addr=%s; rc=%d",
                 disc->addr.type, addr_str(disc->addr.val), rc);
-        return;
+            return;
+        }
     }
 }
 
@@ -214,8 +225,13 @@ static int app_disc_chr_cb(uint16_t conn_handle, const struct ble_gatt_error *er
         }
     }
     if (error && error->status == BLE_HS_EDONE) {
-        s_ble_dev[dev_index].add();
-        ESP_LOGI(TAG, "Added BLE device %s", s_ble_dev[dev_index].adv_name);
+        if (!s_ble_dev[dev_index].reconnect) {
+            s_ble_dev[dev_index].add();
+            ESP_LOGI(TAG, "Added BLE device %s", s_ble_dev[dev_index].adv_name);
+        } else {
+            /* Repopulated for reconnection */
+            xSemaphoreGive(s_sem);
+        }
     }
     return 0;
 }
@@ -259,7 +275,6 @@ static int app_ble_gap_event(struct ble_gap_event *event, void *arg)
     char s[BLE_HS_ADV_MAX_SZ];
     int rc;
     uint32_t dev_index = (uint32_t)arg;
-
     switch (event->type) {
     case BLE_GAP_EVENT_DISC:
         rc = ble_hs_adv_parse_fields(&fields, event->disc.data,
@@ -268,7 +283,7 @@ static int app_ble_gap_event(struct ble_gap_event *event, void *arg)
             return 0;
         }
 
-        /* An advertisment report was received during GAP discovery. */
+        /* An advertisement report was received during GAP discovery. */
         if (fields.name != NULL) {
             assert(fields.name_len < sizeof s - 1);
             memcpy(s, fields.name, fields.name_len);
@@ -276,9 +291,16 @@ static int app_ble_gap_event(struct ble_gap_event *event, void *arg)
             ESP_LOGI(TAG, "Found a BLE device with %s name: %s",
                     fields.name_is_complete ? "complete" : "incomplete", s);
         }
-
-        /* Try to connect to the advertiser if it looks interesting. */
-        app_ble_connect_if_interesting(&event->disc);
+        const char *name = (char *)arg;
+        if (name) {
+            if (strncmp((const char *)s, name, strlen(name)) == 0) {
+                ESP_LOGD(TAG, "Reconnecting to %s", name);
+                /* Try to connect to the advertiser if it looks interesting. */
+                app_ble_connect_if_interesting(&event->disc);
+            }
+        } else {
+            app_ble_connect_if_interesting(&event->disc);
+        }
         return 0;
 
     case BLE_GAP_EVENT_CONNECT:
@@ -293,9 +315,10 @@ static int app_ble_gap_event(struct ble_gap_event *event, void *arg)
         } else {
             ESP_LOGI(TAG, "Failed to establish BLE connection; status=%d", event->connect.status);
         }
-
-        app_ble_scan(false);
-
+        if (!s_ble_dev[dev_index].reconnect) {
+            ESP_LOGD(TAG, "Restarting scan for reconnection");
+            app_ble_scan(2, NULL);
+        }
         return 0;
 
     case BLE_GAP_EVENT_DISCONNECT:
@@ -306,7 +329,7 @@ static int app_ble_gap_event(struct ble_gap_event *event, void *arg)
 
     case BLE_GAP_EVENT_DISC_COMPLETE:
         ESP_LOGI(TAG, "Discovery complete; reason=%d", event->disc_complete.reason);
-        xSemaphoreGive( x_sem );
+        xSemaphoreGive(s_sem);
         return 0;
 
     case BLE_GAP_EVENT_ENC_CHANGE:
@@ -376,8 +399,15 @@ esp_err_t app_ble_update_dev(ble_dev_handle_t dev, uint8_t *data, int len)
         }
     }
     if (dev_index != 0xff) {
-        conn_handle = s_ble_dev[i].conn_handle;
-        val_handle = s_ble_dev[i].chr.val_handle;
+        conn_handle = s_ble_dev[dev_index].conn_handle;
+        val_handle = s_ble_dev[dev_index].chr.val_handle;
+        if (conn_handle == BLE_HS_CONN_HANDLE_NONE) {
+            s_ble_dev[dev_index].reconnect = true;
+            app_ble_scan(1, s_ble_dev[dev_index].adv_name);
+            xSemaphoreTake(s_sem, portMAX_DELAY);
+            conn_handle = s_ble_dev[dev_index].conn_handle;
+        }
+
         if (conn_handle != BLE_HS_CONN_HANDLE_NONE) {
             rc = ble_gattc_write_flat(conn_handle, val_handle,
                     data, len, app_ble_chr_on_write, NULL);
@@ -385,7 +415,7 @@ esp_err_t app_ble_update_dev(ble_dev_handle_t dev, uint8_t *data, int len)
                 ESP_LOGE(TAG, "Failed to write characteristic; rc=%d", rc);
             }
         } else {
-            /* ToDo: Reconnect */
+            return ESP_FAIL;
         }
     }
     return rc;
@@ -404,7 +434,7 @@ static void app_ble_on_sync(void)
     assert(rc == 0);
 
     /* Begin scanning for a peripheral to connect to. */
-    app_ble_scan(true);
+    app_ble_scan(0, NULL);
 }
 
 void app_ble_host_task(void *param)
@@ -420,8 +450,8 @@ void app_ble_start(void)
 {
     int rc;
 
-    x_sem = xSemaphoreCreateBinary();
-    if (!x_sem) {
+    s_sem = xSemaphoreCreateBinary();
+    if (!s_sem) {
         ESP_LOGE(TAG, "Failed to create semaphore");
         return;
     }
@@ -441,5 +471,5 @@ void app_ble_start(void)
 
     nimble_port_freertos_init(app_ble_host_task);
 
-    xSemaphoreTake( x_sem, portMAX_DELAY );
+    xSemaphoreTake(s_sem, portMAX_DELAY);
 }
