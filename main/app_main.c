@@ -19,8 +19,8 @@
 
 #include "app_priv.h"
 #include "app_ble.h"
-#include "syska_light.h"
-#include "playbulb_light.h"
+#include "accessories/syska_light.h"
+#include "accessories/playbulb_light.h"
 
 static const char *TAG = "app_main";
 
