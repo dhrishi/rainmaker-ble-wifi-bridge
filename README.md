@@ -41,12 +41,13 @@ Currently supported accessories:
 
 Note:
 1. Files `main/accessories/sample_accessory.[ch]` are only for reference and are not compiled.
-2. The total number of registered accessories you want to use at a time should not exceed [maximum allowed devices] (main/app_ble.h#L12). If required, you can change the default value using menuconfig `Component config -> Bluetooth -> Bluetooth controller -> BLE Max Connections`.
+2. The total number of registered accessories you want to use at a time should not exceed [maximum allowed devices] (https://github.com/dhrishi/rainmaker-ble-wifi-bridge/blob/master/main/app_ble.h#L12). If required, you can change the default value using menuconfig `Component config -> Bluetooth -> Bluetooth controller -> BLE Max Connections`.
 
 ### Limitations
 
 - The added BLE accessory should be discoverable before starting the RainMaker framework.
 - For now, the BLE service and characteristic UUIDs of the parameters to be controlled should be 16 bit.
+- Getting the parameter values (BLE read) from the accessory is not yet supported
 
 ### Reset to Factory
 
