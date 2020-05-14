@@ -39,9 +39,9 @@ Currently supported accessories:
 - Include the C header file `accessories/accessory-name_type.h` in `main/app_main.c` and add a call to the register function `accessory-name_type_register()` before `app_ble_start()`
 - Add the entry of the source file `acessory-name_type.c` in `main/CMakeLists.txt`
 
-Note:
+Notes:
 1. Files `main/accessories/sample_accessory.[ch]` are only for reference and are not compiled.
-2. The total number of registered accessories you want to use at a time should not exceed [maximum allowed devices] (https://github.com/dhrishi/rainmaker-ble-wifi-bridge/blob/master/main/app_ble.h#L12). If required, you can change the default value using menuconfig `Component config -> Bluetooth -> Bluetooth controller -> BLE Max Connections`.
+2. The total number of registered accessories you want to use at a time should not exceed `MAX_DEV` in `main/app_ble.h`. If required, you can change the default value using menuconfig `Component config -> Bluetooth -> Bluetooth controller -> BLE Max Connections`.
 
 ### Limitations
 
